@@ -6,8 +6,9 @@ import mdx from '@astrojs/mdx';
 
 // https://astro.build/config
 export default defineConfig({
-  site: 'https://username.github.io',
-  base: '/whimsy-hub',
+  site: 'https://everwynn.github.io',
+  // 仓库名
+  base: '/whimsy-hub/',
 
   integrations: [
     vue(),
