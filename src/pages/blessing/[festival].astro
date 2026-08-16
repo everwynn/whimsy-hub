@@ -1,0 +1,18 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import BlessingPage from '../../modules/blessing/BlessingPage.vue';
+import festivals from '../../data/festivals.json';
+
+export function getStaticPaths() {
+  return festivals.map((f: any) => ({
+    params: { festival: f.id },
+    props: { festivalId: f.id },
+  }));
+}
+
+const { festivalId } = Astro.props;
+---
+
+<BaseLayout title="七夕祝福">
+  <BlessingPage client:load festivalId={festivalId} />
+</BaseLayout>

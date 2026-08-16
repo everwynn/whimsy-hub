@@ -1,0 +1,24 @@
+---
+import '../assets/global.css';
+
+interface Props {
+  title: string;
+  description?: string;
+}
+
+const { title, description = '奇思妙想中心 - 互动祝福体验' } = Astro.props;
+---
+
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content={description} />
+    <link rel="icon" type="image/svg+xml" href="/whimsy-hub/favicon.svg" />
+    <title>{title} | Whimsy Hub</title>
+  </head>
+  <body class="bg-gray-50 text-gray-900">
+    <slot />
+  </body>
+</html>
