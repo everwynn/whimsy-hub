@@ -15,14 +15,25 @@ function xorCipher(input: string): string {
 }
 
 function safeBase64Encode(str: string): string {
-  return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  // 先将字符串转换为 UTF-8 字节数组，然后再进行 base64 编码
+  const utf8Bytes = new TextEncoder().encode(str);
+  const binaryStr = Array.from(utf8Bytes)
+    .map(byte => String.fromCharCode(byte))
+    .join('');
+  return btoa(binaryStr).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
 function safeBase64Decode(str: string): string {
   str = str.replace(/-/g, '+').replace(/_/g, '/');
   const pad = str.length % 4;
   if (pad) str += '='.repeat(4 - pad);
-  return atob(str);
+  
+  const binaryStr = atob(str);
+  const bytes = new Uint8Array(binaryStr.length);
+  for (let i = 0; i < binaryStr.length; i++) {
+    bytes[i] = binaryStr.charCodeAt(i);
+  }
+  return new TextDecoder().decode(bytes);
 }
 
 export interface SharePayload {

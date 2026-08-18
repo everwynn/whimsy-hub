@@ -42,15 +42,15 @@
           />
         </div>
         <div class="bloom-overlay">
-          <p class="step-hint">{{ stepHintText }}</p>
-          <div class="bloom-actions">
-            <button v-if="!isShareMode && stepDone[0]" @click="goToStep(1)" class="next-btn">
-              欣赏完毕，去摇签 →
-            </button>
-            <button v-if="!isShareMode" @click="shareBloom" class="share-icon-btn" title="分享此页面">
-              <span>分享</span>
-            </button>
-          </div>
+<!--          <p class="step-hint">{{ stepHintText }}</p>-->
+<!--          <div class="bloom-actions">-->
+<!--            <button v-if="!isShareMode && stepDone[0]" @click="goToStep(1)" class="next-btn">-->
+<!--              欣赏完毕，去摇签 →-->
+<!--            </button>-->
+<!--            <button v-if="!isShareMode" @click="shareBloom" class="share-icon-btn" title="分享此页面">-->
+<!--              <span>分享</span>-->
+<!--            </button>-->
+<!--          </div>-->
         </div>
       </div>
 

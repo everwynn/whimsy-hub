@@ -1,19 +1,66 @@
 <template>
   <div class="scene-wrapper" ref="wrapperRef">
     <canvas ref="canvasRef" @click="onCanvasClick" />
-    <div v-if="showControls" class="canvas-controls">
-      <button @click="togglePlay" class="ctrl-btn">{{ isPlaying ? '暂停' : '播放' }}</button>
-      <button @click="replay" class="ctrl-btn">重播</button>
-      <button @click="toggleMusic" class="ctrl-btn music-btn" :class="{ active: musicOn }" :title="audioLoaded ? (musicOn ? '关闭音乐' : '开启音乐') : '暂无音乐文件'">
-        {{ musicOn ? '静音' : '音乐' }}
-      </button>
+    <div class="top-text">
+<!--      鹊桥已成 · 牛郎织女终相会 · 点击画面有惊喜 · 可开启背景音乐-->
+      · 牛郎织女终相会 ·
     </div>
-    <audio ref="audioRef" :src="musicSrc" loop preload="metadata" @canplaythrough="audioLoaded = true" @error="audioLoaded = false"></audio>
+    <div v-if="!isSharedView" class="button-group">
+      <div class="icon-wrapper" @mouseenter="showTooltip('rose')" @mouseleave="hideTooltip">
+        <a :href="withBase('/rose')" class="nav-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <!-- 简洁的玫瑰花图标 -->
+            <path d="M12 8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z" /> <!-- 花心 -->
+            <path d="M12 5c-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4-1.79-4-4-4z" /> <!-- 内花瓣 -->
+            <path d="M12 2c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6z" /> <!-- 外花瓣 -->
+            <path d="M8 14l-2 4" /> <!-- 花茎 -->
+            <path d="M16 14l2 4" /> <!-- 花茎 -->
+            <path d="M10 16l-2 4" /> <!-- 花茎 -->
+            <path d="M14 16l2 4" /> <!-- 花茎 -->
+            <path d="M10 16c0 1 1.5 2 2 2s2-1 2-2" /> <!-- 叶子 -->
+          </svg>
+        </a>
+        <div :class="{'tooltip': true, 'visible': tooltip === 'rose'}">玫瑰花</div>
+      </div>
+      <div class="icon-wrapper" @mouseenter="showTooltip('fortune')" @mouseleave="hideTooltip">
+        <a :href="withBase('/blessing/qixi')" class="nav-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <!-- 简洁的摇签筒图标 -->
+            <path d="M8 3h8v16a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2V3z" /> <!-- 筒身 -->
+            <path d="M10 3L8 1" /> <!-- 顶部装饰 -->
+            <path d="M14 3L16 1" /> <!-- 顶部装饰 -->
+            <path d="M12 5v4" /> <!-- 筒内签条 -->
+            <path d="M12 10v4" /> <!-- 筒内签条 -->
+            <path d="M12 15v4" /> <!-- 筒内签条 -->
+          </svg>
+        </a>
+        <div :class="{'tooltip': true, 'visible': tooltip === 'fortune'}">摇签</div>
+      </div>
+      <div class="icon-wrapper" @mouseenter="showTooltip('share')" @mouseleave="hideTooltip">
+        <button @click="shareContent" class="nav-icon">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <!-- 简洁的分享图标 -->
+            <circle cx="18" cy="5" r="3" />
+            <circle cx="6" cy="12" r="3" />
+            <circle cx="18" cy="19" r="3" />
+            <path d="M8.59 13.51l6.83 3.98" />
+            <path d="M15.41 6.51l-6.82 3.98" />
+          </svg>
+        </button>
+        <div :class="{'tooltip': true, 'visible': tooltip === 'share'}">分享</div>
+      </div>
+    </div>
+    <!-- 使用统一的音乐播放器组件 -->
+    <MusicPlayer :music-src="musicSrc" />
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue';
+import { buildShareUrl } from '../../utils/shareCodec';
+import type { SharePayload } from '../../utils/shareCodec';
+import MusicPlayer from '../../components/shared/MusicPlayer.vue';
+import { withBase } from '../../utils/baseUrl';
 
 interface Props { autoPlay?: boolean; showControls?: boolean; loop?: boolean; }
 const props = withDefaults(defineProps<Props>(), { autoPlay: true, showControls: true, loop: false });
@@ -21,11 +68,64 @@ const emit = defineEmits<{ (e: 'scene-complete'): void }>();
 
 const wrapperRef = ref<HTMLElement>();
 const canvasRef = ref<HTMLCanvasElement>();
-const audioRef = ref<HTMLAudioElement>();
+// 移除了原来的 audioRef，因为使用了 MusicPlayer 组件
 const isPlaying = ref(true);
 const musicOn = ref(false);
 const audioLoaded = ref(false);
-const musicSrc = `${import.meta.env.BASE_URL}music/qixi-bg.mp3`;
+const musicSrc = withBase('musics/clavier-music-canon-canon-in-d.mp3');
+
+// 检测是否为分享页面
+const isSharedView = ref(false);
+
+// 在组件挂载时检查 URL 参数
+onMounted(() => {
+  // 检查 URL 中是否有分享相关的参数
+  const urlParams = new URLSearchParams(window.location.search);
+  const encodedParam = urlParams.get('s'); // 假设分享链接使用 's' 参数
+  
+  isSharedView.value = !!encodedParam;
+});
+
+// 添加 tooltip 相关数据
+const tooltip = ref('');
+
+function showTooltip(iconType: string) {
+  tooltip.value = iconType;
+}
+
+function hideTooltip() {
+  tooltip.value = '';
+}
+
+// 分享功能
+function shareContent() {
+  // 构建分享载荷
+  const payload: SharePayload = {
+    festivalId: 'qixi',
+    step: 1,
+    from: '牛郎织女鹊桥相会',
+    msg: '欣赏牛郎织女鹊桥相会的浪漫场景'
+  };
+
+  // 生成加密分享链接
+  const shareLink = buildShareUrl(payload);
+
+  // 如果浏览器支持 Web Share API
+  if (navigator.share) {
+    navigator.share({
+      title: '七夕鹊桥相会',
+      text: '欣赏牛郎织女鹊桥相会的浪漫场景',
+      url: shareLink
+    }).catch(console.error);
+  } else {
+    // 否则复制链接到剪贴板
+    navigator.clipboard.writeText(shareLink).then(() => {
+      alert('链接已复制到剪贴板！');
+    }).catch(err => {
+      console.error('复制失败:', err);
+    });
+  }
+}
 
 let animationId: number | null = null;
 let startTime = 0;
@@ -1146,17 +1246,21 @@ function replay() {
   animationId = requestAnimationFrame(render);
 }
 
-function toggleMusic() {
-  const audio = audioRef.value;
-  if (!audio || !audioLoaded.value) return;
-  if (musicOn.value) {
-    audio.pause();
-    musicOn.value = false;
+function onVisibilityChange() {
+  if (document.hidden) {
+    paused = true; isPlaying.value = false;
+    if (animationId) cancelAnimationFrame(animationId);
   } else {
-    audio.volume = 0.5;
-    audio.play().then(() => { musicOn.value = true; }).catch(() => { musicOn.value = false; });
+    if (props.autoPlay) {
+      startTime = Date.now();
+      paused = false; isPlaying.value = true; resetScene();
+      if (animationId) cancelAnimationFrame(animationId);
+      animationId = requestAnimationFrame(render);
+    }
   }
 }
+
+// 不再需要 toggleMusic 函数，因为使用了 MusicPlayer 组件
 
 function setupCanvas() {
   const canvas = canvasRef.value;
@@ -1181,8 +1285,7 @@ onMounted(() => {
 onUnmounted(() => {
   if (animationId) cancelAnimationFrame(animationId);
   if (resizeObserver) resizeObserver.disconnect();
-  const audio = audioRef.value;
-  if (audio) { audio.pause(); audio.src = ''; }
+  // 移除对 audioRef 的清理，因为不再使用页面内的音频控制
 });
 defineExpose({ replay, togglePlay });
 </script>
@@ -1195,4 +1298,83 @@ defineExpose({ replay, togglePlay });
 .ctrl-btn:hover { background: rgba(124, 58, 237, 0.4); border-color: rgba(167, 139, 250, 0.5); color: white; }
 .ctrl-btn.music-btn.active { background: rgba(244, 63, 94, 0.35); border-color: rgba(244, 63, 94, 0.6); color: rgba(255, 200, 210, 0.95); }
 .ctrl-btn:not(.active)[title='暂无音乐文件'] { opacity: 0.5; cursor: not-allowed; }
+
+/* 图标按钮组 */
+.button-group {
+  position: absolute;
+  bottom: 80px; /* 调整位置到页面底部中央上方 */
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 20px;
+  z-index: 15;
+}
+
+.icon-wrapper {
+  position: relative;
+  display: inline-block;
+}
+
+.nav-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(10px);
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+}
+
+.nav-icon:hover {
+  background: rgba(0, 0, 0, 0.5);
+  transform: scale(1.1);
+}
+
+.tooltip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0, 0, 0, 0.75);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+  z-index: 100;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.tooltip.visible {
+  opacity: 1;
+}
+
+.tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 4px solid transparent;
+  border-top-color: rgba(0, 0, 0, 0.75);
+}
+
+.top-text {
+  position: absolute;
+  top: 20px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  color: white;
+  font-size: 14px;
+  z-index: 10;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+}
 </style>
