@@ -37,7 +37,7 @@ function initAudio() {
   if (!bgAudio) {
     bgAudio = new Audio(props.musicSrc);
     bgAudio.loop = true;
-    bgAudio.volume = 0.4; // 适中音量
+    bgAudio.volume = 0.7; // 适中偏高音量，适配手机设备
     
     // 添加更多音频事件处理
     bgAudio.oncanplay = () => {
