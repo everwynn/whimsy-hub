@@ -70,3 +70,31 @@ export function buildShareUrl(payload: SharePayload): string {
   const encoded = encodeSharePayload({ ...payload, ts: Date.now() });
   return `${origin}${base}blessing/${payload.festivalId}?s=${encoded}`;
 }
+
+/**
+ * 生成玫瑰花页面的加密分享链接
+ */
+export function buildRoseShareUrl(): string {
+  const base = (import.meta.env.BASE_URL || '/whimsy-hub').replace(/\/?$/, '/');
+  const origin = window.location.origin;
+  const payload = { page: 'rose', ts: Date.now() };
+  const json = JSON.stringify(payload);
+  const xored = xorCipher(json);
+  const encoded = safeBase64Encode(xored);
+  return `${origin}${base}rose?s=${encoded}`;
+}
+
+/**
+ * 解码玫瑰花页面的分享链接参数
+ */
+export function decodeRoseSharePayload(encoded: string): { page: string; ts?: number } | null {
+  try {
+    const xored = safeBase64Decode(encoded);
+    const json = xorCipher(xored);
+    const payload = JSON.parse(json);
+    if (payload.page !== 'rose') return null;
+    return payload;
+  } catch {
+    return null;
+  }
+}

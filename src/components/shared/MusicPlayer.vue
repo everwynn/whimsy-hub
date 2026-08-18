@@ -39,16 +39,32 @@ function initAudio() {
     bgAudio.loop = true;
     bgAudio.volume = 0.4; // 适中音量
     
+    // 添加更多音频事件处理
     bgAudio.oncanplay = () => {
+      console.log('音频已准备就绪');
       isAudioReady = true;
     };
     
+    bgAudio.oncanplaythrough = () => {
+      console.log('音频可以流畅播放');
+    };
+    
     bgAudio.onplay = () => {
+      console.log('音频开始播放');
       musicEnabled.value = true;
     };
     
     bgAudio.onpause = () => {
+      console.log('音频暂停');
       musicEnabled.value = false;
+    };
+    
+    bgAudio.onerror = (e) => {
+      console.error('音频加载错误:', e);
+    };
+    
+    bgAudio.onloadedmetadata = () => {
+      console.log('音频元数据加载完成');
     };
   }
 }
@@ -63,12 +79,33 @@ function toggleMusic() {
     musicEnabled.value = false;
   } else {
     // 当前音乐关闭，需要开启
-    bgAudio.play().then(() => {
-      musicEnabled.value = true;
-    }).catch(e => {
-      console.log('音频播放被阻止:', e);
-      musicEnabled.value = false;
-    });
+    bgAudio.play()
+      .then(() => {
+        console.log('音频播放成功');
+        musicEnabled.value = true;
+      })
+      .catch(e => {
+        console.error('音频播放被阻止:', e);
+        // 如果被阻止，尝试先加载再播放
+        if (e.name === 'AbortError' || e.name === 'NotAllowedError') {
+          // 首先尝试加载音频
+          bgAudio.load();
+          
+          // 使用 setTimeout 确保在下一个事件循环中尝试播放
+          setTimeout(() => {
+            bgAudio.play()
+              .then(() => {
+                console.log('延迟音频播放成功');
+                musicEnabled.value = true;
+              })
+              .catch(err => {
+                console.error('延迟音频播放也被阻止:', err);
+                console.log('可能需要用户更多交互才能播放音乐');
+              });
+          }, 100);
+        }
+        musicEnabled.value = false;
+      });
   }
 }
 
@@ -80,7 +117,13 @@ function handleVisibilityChange() {
     bgAudio.pause();
   } else if (musicEnabled.value) {
     bgAudio.play().catch(e => {
-      console.log('音频播放被阻止:', e);
+      console.error('页面可见性变化时音频播放被阻止:', e);
+      // 尝试延迟播放
+      setTimeout(() => {
+        bgAudio.play().catch(err => {
+          console.log('页面可见性变化时延迟播放也被阻止:', err);
+        });
+      }, 100);
     });
   }
 }

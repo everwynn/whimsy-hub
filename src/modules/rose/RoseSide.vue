@@ -14,40 +14,76 @@
     <MusicPlayer :music-src="musicSrc" />
 
     <div class="rose-overlay">
+      <!-- 分享链接信息 -->
+      <div v-if="isRoseShareMode && roseFrom" class="rose-share-header">
+        <p class="rose-share-from">来自 {{ roseFrom }} 的祝福</p>
+        <h1 v-if="roseTo" class="rose-share-to">Dear {{ roseTo }}</h1>
+        <p v-if="roseMsg" class="rose-share-msg">{{ roseMsg }}</p>
+      </div>
       <p class="rose-hint">{{ hintText }}</p>
       <div class="rose-actions">
-        <button v-if="autoPlayDone" class="replay-btn" @click="replay">再次绽放</button>
-        <button v-if="!isShareMode" class="share-icon-btn" @click="shareRose" title="分享此页面">分享1</button>
+        <!-- 再次绽放（始终显示） -->
+        <button v-if="autoPlayDone" class="icon-btn" @click="replay" title="再次绽放">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4l4-4 4 4H6c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/>
+          </svg>
+        </button>
+        <!-- 鹊桥相会（非分享模式显示） -->
+        <a v-if="!isRoseShareMode" :href="withBase('/blessing/qixi')" class="icon-btn" title="鹊桥相会">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M17.5 19c0-1.7-1.3-3-3-3h-5c-1.7 0-3 1.3-3 3"/>
+            <path d="M12 16V8"/>
+            <path d="M8 10l4-4 4 4"/>
+            <path d="M6 19c0-2 2-4 6-4s6 2 6 4"/>
+          </svg>
+        </a>
+        <!-- 摇签（非分享模式显示） -->
+        <a v-if="!isRoseShareMode" :href="withBase('/blessing/qixi?step=1')" class="icon-btn" title="摇签">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M8 3h8v16a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2V3z"/>
+            <path d="M10 3L8 1"/>
+            <path d="M14 3L16 1"/>
+            <path d="M12 5v4"/>
+            <path d="M12 10v4"/>
+            <path d="M12 15v4"/>
+          </svg>
+        </a>
+        <!-- 分享（非分享模式显示） -->
+        <button v-if="!isShareMode && !isRoseShareMode" class="icon-btn" @click="shareRose" title="分享">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="18" cy="5" r="3"/>
+            <circle cx="6" cy="12" r="3"/>
+            <circle cx="18" cy="19" r="3"/>
+            <path d="M8.59 13.51l6.83 3.98"/>
+            <path d="M15.41 6.51l-6.82 3.98"/>
+          </svg>
+        </button>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-console.log('RoseSide.vue script loaded');
-
-// 在 setup 阶段就记录
-console.log('RoseSide component setup initiated');
-
-console.log('Starting to import libraries');
-
+// 导入语句必须在顶层作用域
 import { ref, onMounted, onUnmounted } from 'vue';
-console.log('Vue imports successful');
-
 import * as THREE from 'three';
-console.log('THREE imports successful');
-
-import { buildShareUrl } from '../../utils/shareCodec';
-console.log('ShareCodec imports successful');
-
+import { buildShareUrl, buildRoseShareUrl, decodeRoseSharePayload } from '../../utils/shareCodec';
 import MusicPlayer from '../../components/shared/MusicPlayer.vue';
-console.log('MusicPlayer imports successful');
-
 import { withBase } from '../../utils/baseUrl';
-console.log('BaseURL imports successful');
+
+// 日志记录
+console.log('RoseSide.vue script loaded');
+console.log('RoseSide component setup initiated');
+console.log('All imports successful');
 
 const props = defineProps({ isShareMode: Boolean });
 const emit = defineEmits(['share-step']);
+
+// 分享链接信息
+const roseFrom = ref('');
+const roseTo = ref('');
+const roseMsg = ref('');
+const isRoseShareMode = ref(false);
 
 // 立即执行的代码，用于测试组件是否被正确实例化
 console.log('Props received:', props.isShareMode);
@@ -59,8 +95,11 @@ if (typeof window !== 'undefined') {
   console.log('Running in SSR environment');
 }
 
+// 添加初始化检查
+console.log('Creating refs...');
 const canvasRef = ref();
 const autoPlayDone = ref(false);
+console.log('Refs created successfully');
 const hintText = ref('一朵玫瑰，从枝头悄然绽放...');
 const musicSrc = withBase('musics/clavier-music-canon-canon-in-d.mp3'); // 音乐源
 
@@ -400,13 +439,13 @@ function initScene() {
       console.error('Failed to create WebGL renderer');
       return;
     }
-    
+
     // 检查 WebGL 上下文是否成功创建
     if (!renderer.getContext()) {
       console.error('Failed to get WebGL context');
       return;
     }
-    
+
     console.log('WebGL context created successfully');
 
     renderer.setSize(window.innerWidth, window.innerHeight);
@@ -555,7 +594,7 @@ function initScene() {
     scene.add(effectPoints);
 
     console.log('Scene initialized successfully');
-    
+
     // 强制渲染一帧以确保场景正确初始化
     if (renderer && scene && camera) {
       renderer.render(scene, camera);
@@ -582,7 +621,7 @@ function render(time) {
   }
   const elapsed = time - startTime;
   const progress = Math.min(1, elapsed / DURATION);
-  
+
   // 输出进度，每秒一次
   if (Math.floor(elapsed / 1000) !== Math.floor((elapsed - 16) / 1000)) {
     console.log('Animation progress:', progress.toFixed(2));
@@ -591,21 +630,21 @@ function render(time) {
   // 花茎生长（0-40％，底部固定，向上生长）
   const stemProg = easeOutCubic(Math.min(1, progress / 0.40));
   stemGroup.scale.set(1, stemProg, 1);
-    
+
   // 添加花茎生长调试信息
   if (Math.floor(elapsed / 1000) !== Math.floor((elapsed - 16) / 1000)) {
     console.log('Stem growth progress:', stemProg.toFixed(2), 'Y-scale:', stemGroup.scale.y);
   }
-  
+
   // 花头出现（茎长到70%时开始淡入）
   const flowerAppearT = Math.max(0, Math.min(1, (progress - 0.28) / 0.07));
   flowerCenter.visible = flowerAppearT > 0;
-  
+
   // 添加调试信息
   if (Math.floor(elapsed / 1000) !== Math.floor((elapsed - 16) / 1000)) {
     console.log('Flower visibility:', flowerCenter.visible, 'Progress:', progress.toFixed(2), 'flowerAppearT:', flowerAppearT.toFixed(2));
   }
-  
+
   if (flowerCenter.visible) {
     // 在绽放过程中跟随茎顶端，绽放完成后固定在稳定位置
     if (progress < 1) {
@@ -686,7 +725,7 @@ function render(time) {
   camera.position.x = Math.sin(time * 0.0002) * 0.10;
   camera.position.y = -0.3 + Math.sin(time * 0.0003) * 0.05;
   camera.lookAt(0, -0.3, 0); // 与花头位置保持一致
-  
+
   // 确保相机矩阵更新
   camera.updateMatrixWorld();
 
@@ -769,7 +808,7 @@ function render(time) {
 
   if (progress >= 1 && !autoPlayDone.value) {
     autoPlayDone.value = true;
-    hintText.value = '玫瑰已为你绽放 · 愿爱意长存';
+    hintText.value = '玫瑰为你绽放 · 愿爱意长存';
   }
 
   // 确保渲染正常执行
@@ -815,7 +854,26 @@ function replay() {
 }
 
 function shareRose() {
-  emit('share-step');
+  // 生成玫瑰花页面的加密分享链接
+  const url = buildRoseShareUrl();
+  if (navigator.share) {
+    navigator.share({
+      title: '玫瑰绽放',
+      text: '一朵玫瑰，从枝头悄然绽放...',
+      url
+    }).catch(console.error);
+  } else {
+    navigator.clipboard.writeText(url).then(() => {
+      hintText.value = '链接已复制，快去分享吧！';
+      setTimeout(() => {
+        if (autoPlayDone.value) {
+          hintText.value = '玫瑰为你绽放 · 愿爱意长存';
+        }
+      }, 2000);
+    }).catch(err => {
+      console.error('复制失败:', err);
+    });
+  }
 }
 
 function onResize() {
@@ -852,7 +910,18 @@ onMounted(() => {
   // 确保在浏览器环境中运行
   if (typeof window !== 'undefined') {
     console.log('Running in browser environment');
-    
+
+    // 解析加密分享链接
+    const params = new URLSearchParams(window.location.search);
+    const encoded = params.get('s');
+    if (encoded) {
+      const payload = decodeRoseSharePayload(encoded);
+      if (payload && payload.page === 'rose') {
+        isRoseShareMode.value = true;
+        // 可以从 payload 中扩展更多字段（from, to, msg）
+      }
+    }
+
     // 确保 DOM 已经完全加载
     if (document.readyState === 'loading') {
       console.log('Document still loading, waiting for DOMContentLoaded');
@@ -874,7 +943,7 @@ onMounted(() => {
         startAnimation();
       }, 50);
     }
-    
+
     // 同时监听页面可见性，确保在页面变为可见时也能正确初始化
     const handleVisibilityChange = () => {
       if (!document.hidden && (!scene || !renderer)) {
@@ -886,15 +955,15 @@ onMounted(() => {
         }, 100);
       }
     };
-    
+
     document.addEventListener('visibilitychange', handleVisibilityChange);
-    
+
     // 清理事件监听器
     onUnmounted(() => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       if (rafId) cancelAnimationFrame(rafId);
       window.removeEventListener('resize', onResize);
-      
+
       if (renderer) {
         renderer.dispose();
         scene?.traverse(obj => {
@@ -907,7 +976,7 @@ onMounted(() => {
       }
     });
   }
-  
+
   window.addEventListener('resize', onResize);
 });
 </script>
@@ -1052,6 +1121,45 @@ onMounted(() => {
   pointer-events: auto;
 }
 
+/* 分享链接信息 */
+.rose-share-header {
+  text-align: center;
+  margin-bottom: 16px;
+  animation: fadeIn 0.6s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.rose-share-from {
+  font-size: 14px;
+  color: rgba(251, 191, 136, 0.6);
+  margin-bottom: 8px;
+  letter-spacing: 2px;
+  font-family: 'Noto Serif SC', serif;
+}
+
+.rose-share-to {
+  font-size: 28px;
+  font-weight: bold;
+  background: linear-gradient(to right, #fda4af, #f43f5e);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 16px;
+  font-family: 'Noto Serif SC', serif;
+}
+
+.rose-share-msg {
+  font-size: 15px;
+  color: rgba(255, 255, 255, 0.7);
+  font-style: italic;
+  line-height: 1.8;
+  font-family: 'Noto Serif SC', serif;
+}
+
 .rose-hint {
   font-size: 0.9rem;
   color: rgba(255, 255, 255, 0.5);
@@ -1067,40 +1175,31 @@ onMounted(() => {
   gap: 12px;
 }
 
-.share-icon-btn {
-  padding: 8px 18px;
-  border-radius: 9999px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  background: rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(8px);
-  color: rgba(255, 255, 255, 0.7);
-  font-size: 0.85rem;
-  font-family: 'Noto Serif SC', serif;
-  cursor: pointer;
-  transition: all 0.3s;
-}
-
-.share-icon-btn:hover {
-  background: rgba(255, 255, 255, 0.15);
+.icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(10px);
   color: white;
-  border-color: rgba(255, 255, 255, 0.3);
-}
-
-.replay-btn {
-  padding: 10px 28px;
-  border-radius: 9999px;
-  border: 1px solid rgba(244, 63, 94, 0.35);
-  background: linear-gradient(135deg, rgba(244, 63, 94, 0.12), rgba(225, 29, 72, 0.12));
-  backdrop-filter: blur(8px);
-  color: rgba(244, 63, 95, 0.9);
-  font-size: 0.85rem;
-  font-family: 'Noto Serif SC', serif;
   cursor: pointer;
-  transition: all 0.3s;
+  transition: all 0.3s ease;
+  text-decoration: none;
+  outline: none;
+  padding: 0;
 }
 
-.replay-btn:hover {
-  background: linear-gradient(135deg, rgba(244, 63, 94, 0.22), rgba(225, 29, 72, 0.22));
-  box-shadow: 0 0 20px rgba(244, 63, 94, 0.15);
+.icon-btn:hover {
+  background: rgba(0, 0, 0, 0.5);
+  transform: scale(1.1);
+}
+
+.icon-btn svg {
+  width: 20px;
+  height: 20px;
 }
 </style>

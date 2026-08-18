@@ -10,14 +10,14 @@
       <p v-if="blessingMsg" class="blessing-msg">{{ blessingMsg }}</p>
     </div>
 
-    <!-- 标题 -->
-    <div v-if="!isShareMode && !blessingFrom" class="page-header">
+    <!-- 标题（水合后显示，鹊桥全屏步骤隐藏，避免 SSR 闪烁） -->
+    <div v-if="hydrated && !isShareMode && !blessingFrom && currentStep !== 0" class="page-header">
       <h1 class="festival-title">{{ festival?.icon }} {{ festival?.name }}</h1>
       <p class="festival-subtitle">{{ festival?.alias }}</p>
     </div>
 
-    <!-- 步骤导航 -->
-    <div v-if="!isShareMode" class="step-nav">
+    <!-- 步骤导航（水合后显示，鹊桥全屏步骤隐藏，避免 SSR 闪烁） -->
+    <div v-if="hydrated && !isShareMode && currentStep !== 0" class="step-nav">
       <button
         v-for="(step, idx) in steps"
         :key="idx"
@@ -123,6 +123,9 @@ const blessingTo = ref('');
 const blessingMsg = ref('');
 const isShareMode = ref(false);
 
+// SSR 水合标记：避免 SSR 渲染的标题和步骤栏在客户端水合前闪烁
+const hydrated = ref(false);
+
 const stepHintText = computed(() => {
   if (stepDone.value[0]) return '鹊桥已成 · 牛郎织女终相会 · 点击画面有惊喜 · 可开启背景音乐';
   return '喜鹊正在从四方飞来搭建鹊桥，牛郎织女即将相会...';
@@ -176,7 +179,7 @@ function copyToClipboard(url: string, successMsg: string) {
 }
 
 onMounted(() => {
-  // 解析加密分享链接
+  // 先解析 URL 参数，确保 currentStep 在水合前就是正确的值，避免标题/导航栏闪烁
   const params = new URLSearchParams(window.location.search);
   const encoded = params.get('s');
   isShareMode.value = !!encoded;
@@ -205,7 +208,23 @@ onMounted(() => {
         currentStep.value = 0;
       }
     }
+  } else {
+    // 非分享模式：支持通过 step 参数直接跳转到指定步骤
+    const stepParam = params.get('step');
+    if (stepParam !== null) {
+      const step = parseInt(stepParam, 10);
+      if (step >= 0 && step <= 3) {
+        currentStep.value = step;
+        // 标记前面的步骤为已完成
+        for (let i = 0; i < step; i++) {
+          stepDone.value[i] = true;
+        }
+      }
+    }
   }
+
+  // 参数解析完成后再标记水合，确保标题/导航栏不会因 currentStep 变化而闪烁
+  hydrated.value = true;
 });
 </script>
 
