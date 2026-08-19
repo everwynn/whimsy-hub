@@ -112,7 +112,7 @@ console.log('Creating refs...');
 const canvasRef = ref();
 const autoPlayDone = ref(false);
 console.log('Refs created successfully');
-const hintText = ref('一朵玫瑰，在月下悄然盛放…');
+const hintText = ref('「红玫瑰・悄然盛放」');
 const textOpacity = ref(0); // 主标题透明度，跟随绽放进度
 const subtitleOpacity = ref(0); // 副标题透明度，盛开后浮现
 const musicSrc = withBase('musics/clavier-music-canon-canon-in-d.mp3'); // 音乐源
@@ -886,7 +886,7 @@ function render(time) {
 function startAnimation() {
   startTime = 0;
   autoPlayDone.value = false;
-  hintText.value = '一朵玫瑰，在月下悄然盛放…';
+  hintText.value = '「红玫瑰・悄然盛放」';
   textOpacity.value = 0;
   subtitleOpacity.value = 0;
   if (effectPoints) {
@@ -930,7 +930,7 @@ function shareRose() {
   if (navigator.share) {
     navigator.share({
       title: '玫瑰绽放',
-      text: '一朵玫瑰，在月下悄然盛放…',
+      text: '「红玫瑰・悄然盛放」',
       url
     }).finally(() => { isSharing = false; })
       .catch(console.error);
