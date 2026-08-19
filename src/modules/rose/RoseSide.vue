@@ -2,11 +2,11 @@
   <div class="rose-side-module">
     <!-- 星空背景（保留2D背景） -->
     <div class="bg-stars" aria-hidden="true">
-      <span v-for="i in 80" :key="'star-'+i" class="star" :style="starStyle(i)"></span>
+      <span v-for="i in 80" :key="'star-'+i" class="star" :style="cachedStarStyles[i - 1]"></span>
     </div>
     <div class="bg-moon" aria-hidden="true"></div>
     <div class="bg-petals" aria-hidden="true">
-      <span v-for="i in 18" :key="'petal-'+i" class="petal" :style="petalStyle(i)"></span>
+      <span v-for="i in 35" :key="'petal-'+i" class="petal" :style="cachedPetalStyles[i - 1]"></span>
     </div>
 
     <canvas ref="canvasRef" class="rose-canvas"></canvas>
@@ -20,7 +20,8 @@
         <h1 v-if="roseTo" class="rose-share-to">Dear {{ roseTo }}</h1>
         <p v-if="roseMsg" class="rose-share-msg">{{ roseMsg }}</p>
       </div>
-      <p class="rose-hint">{{ hintText }}</p>
+      <p class="rose-hint" :style="{ opacity: textOpacity }">{{ hintText }}</p>
+      <p class="rose-subtitle" :style="{ opacity: subtitleOpacity }">愿爱意岁岁绵长</p>
       <div class="rose-actions">
         <!-- 再次绽放（始终显示） -->
         <button v-if="autoPlayDone" class="icon-btn" @click="replay" title="再次绽放">
@@ -65,7 +66,7 @@
 
 <script setup>
 // 导入语句必须在顶层作用域
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, shallowRef, onMounted, onUnmounted } from 'vue';
 import * as THREE from 'three';
 import { buildShareUrl, buildRoseShareUrl, decodeRoseSharePayload } from '../../utils/shareCodec';
 import MusicPlayer from '../../components/shared/MusicPlayer.vue';
@@ -111,11 +112,13 @@ console.log('Creating refs...');
 const canvasRef = ref();
 const autoPlayDone = ref(false);
 console.log('Refs created successfully');
-const hintText = ref('一朵玫瑰，从枝头悄然绽放...');
+const hintText = ref('一朵玫瑰，在月下悄然盛放…');
+const textOpacity = ref(0); // 主标题透明度，跟随绽放进度
+const subtitleOpacity = ref(0); // 副标题透明度，盛开后浮现
 const musicSrc = withBase('musics/clavier-music-canon-canon-in-d.mp3'); // 音乐源
 
 let scene, camera, renderer;
-let stemGroup, petalGroups = [], effectPoints, flowerCenter, sepals = [], heartMesh, heartRippleRing;
+let stemGroup, petalGroups = [], effectPoints, flowerCenter, sepals = [], heartMesh, heartRippleRing, pistil;
 let startTime = 0, rafId = 0;
 const DURATION = 12000;
 
@@ -152,25 +155,37 @@ function createPetalGeometry(length, maxWidth, curlX, curlY) {
   return geo;
 }
 
-// ============ 叶子几何体 ============
+// ============ 叶子几何体（带叶脉纹路） ============
 function createLeafGeometry(length, width) {
-  const wS = 8, hS = 14;
+  const wS = 12, hS = 20;
   const geo = new THREE.PlaneGeometry(width, length, wS, hS);
   const pos = geo.attributes.position;
 
   for (let i = 0; i < pos.count; i++) {
     let x = pos.getX(i);
     const y = pos.getY(i);
-    const t = (y + length / 2) / length;
+    const t = (y + length / 2) / length; // 0=基部, 1=叶尖
 
     // 叶片轮廓：椭圆形带尖端
     const wProfile = Math.sin(Math.pow(t, 0.7) * Math.PI) * (1 - Math.pow(t, 2) * 0.3);
     x = x * wProfile;
 
-    // 叶脉起伏
-    const ripple = Math.sin(t * Math.PI * 5) * 0.004 * Math.abs(x);
+    const nx = width > 0 ? x / width : 0; // 归一化横向位置
 
-    pos.setXYZ(i, x, y, ripple);
+    // 主叶脉（中央脊线）：沿叶片中心线隆起
+    const mainVein = Math.exp(-Math.pow(nx * 8, 2)) * 0.015 * Math.sin(t * Math.PI);
+
+    // 侧叶脉：从主脉向两侧辐射的细纹
+    const sideVeinFreq = 6;
+    const sideVein = Math.sin(nx * Math.PI * sideVeinFreq) * 0.006 * Math.sin(t * Math.PI * 0.8) * Math.exp(-Math.abs(nx) * 3);
+
+    // 叶脉起伏（原有微纹）
+    const ripple = Math.sin(t * Math.PI * 5) * 0.003 * Math.abs(x);
+
+    // 叶片自然弯曲：中部微微拱起
+    const arch = -0.02 * Math.pow(t, 1.5) * (0.3 + 0.7 * Math.pow(nx, 2));
+
+    pos.setXYZ(i, x, y + length / 2, mainVein + sideVein + ripple + arch);
   }
 
   pos.needsUpdate = true;
@@ -199,31 +214,36 @@ function createStem() {
   });
   const mesh = new THREE.Mesh(geo, mat);
 
-  // 茎上的小刺
-  const thornGeo = new THREE.ConeGeometry(0.012, 0.06, 4);
-  const thornMat = new THREE.MeshStandardMaterial({ color: 0x2d5a1e, roughness: 0.6 });
+  // 茎上的小刺（更明显的玫瑰刺）
+  const thornMat = new THREE.MeshStandardMaterial({ color: 0x3a6b2a, roughness: 0.5, metalness: 0.1 });
   const thornPositions = [
-    { t: 0.3, angle: 0.5 },
-    { t: 0.55, angle: 2.8 },
-    { t: 0.75, angle: 4.5 },
+    { t: 0.15, angle: 0.8, size: 0.015, height: 0.07 },
+    { t: 0.30, angle: 3.5, size: 0.012, height: 0.055 },
+    { t: 0.45, angle: 1.2, size: 0.014, height: 0.065 },
+    { t: 0.60, angle: 4.8, size: 0.011, height: 0.05 },
+    { t: 0.75, angle: 2.0, size: 0.013, height: 0.06 },
+    { t: 0.88, angle: 5.5, size: 0.010, height: 0.045 },
   ];
   thornPositions.forEach(tp => {
+    const thornGeo = new THREE.ConeGeometry(tp.size, tp.height, 4);
     const thorn = new THREE.Mesh(thornGeo, thornMat);
     const p = curve.getPointAt(tp.t);
+    const tangent = curve.getTangentAt(tp.t);
     thorn.position.set(
-      p.x + Math.cos(tp.angle) * 0.06,
+      p.x + Math.cos(tp.angle) * 0.055,
       p.y,
-      p.z + Math.sin(tp.angle) * 0.06
+      p.z + Math.sin(tp.angle) * 0.055
     );
-    thorn.rotation.z = Math.cos(tp.angle) * 0.8;
-    thorn.rotation.x = Math.sin(tp.angle) * 0.8;
+    // 刺的方向：尖端朝外，远离茎干
+    thorn.rotation.z = -Math.cos(tp.angle) * 0.9;
+    thorn.rotation.x = -Math.sin(tp.angle) * 0.9;
     mesh.add(thorn);
   });
 
   return mesh;
 }
 
-// ============ 创建叶子 ============
+// ============ 创建叶子（带叶脉颜色） ============
 function createLeaf(length, width, color) {
   const geo = createLeafGeometry(length, width);
   const mat = new THREE.MeshStandardMaterial({
@@ -231,6 +251,8 @@ function createLeaf(length, width, color) {
     side: THREE.DoubleSide,
     roughness: 0.55,
     metalness: 0.05,
+    emissive: new THREE.Color(0x0a3010),
+    emissiveIntensity: 0.1,
   });
   return new THREE.Mesh(geo, mat);
 }
@@ -501,23 +523,23 @@ function initScene() {
     stemGroup.position.set(0, -1.8, 0); // 底部固定
     stemGroup.scale.set(1, 0, 1); // 初始高度为0
 
-    // 叶子（根部连接茎，向侧面水平伸展）
+    // 叶子（根部连接茎，向侧面水平伸展，Y轴旋转让叶面朝向相机）
     const leaf1 = createLeaf(0.40, 0.20, 0x1e7a3a);
-    leaf1.position.set(0.03, 0.5, 0); // 茎表面右侧
-    leaf1.rotation.set(0, 0, -Math.PI/2 + 0.2); // 向右水平展开，稍微调整角度
-    leaf1.userData.baseRotZ = -Math.PI/2 + 0.2;
+    leaf1.position.set(0.025, 0.5, 0); // 茎表面右侧
+    leaf1.rotation.set(0.1, 0.4, -Math.PI/2 + 0.15); // 向右展开，叶面朝向相机
+    leaf1.userData.baseRotZ = -Math.PI/2 + 0.15;
     stemGroup.add(leaf1);
 
     const leaf2 = createLeaf(0.35, 0.17, 0x22883e);
-    leaf2.position.set(-0.03, 0.9, 0); // 茎表面左侧
-    leaf2.rotation.set(0, 0, Math.PI/2 - 0.2); // 向左水平展开，稍微调整角度
-    leaf2.userData.baseRotZ = Math.PI/2 - 0.2;
+    leaf2.position.set(-0.025, 0.9, 0); // 茎表面左侧
+    leaf2.rotation.set(-0.1, -0.35, Math.PI/2 - 0.15); // 向左展开，叶面朝向相机
+    leaf2.userData.baseRotZ = Math.PI/2 - 0.15;
     stemGroup.add(leaf2);
 
     const leaf3 = createLeaf(0.28, 0.14, 0x2a8a45);
-    leaf3.position.set(0.025, 1.15, 0);
-    leaf3.rotation.set(0, 0, -Math.PI/2 + 0.25); // 稍微不同的角度
-    leaf3.userData.baseRotZ = -Math.PI/2 + 0.25;
+    leaf3.position.set(0.02, 1.2, 0); // 茎表面右侧
+    leaf3.rotation.set(0.15, 0.45, -Math.PI/2 + 0.2); // 向右展开，叶面朝向相机
+    leaf3.userData.baseRotZ = -Math.PI/2 + 0.2;
     stemGroup.add(leaf3);
 
     scene.add(stemGroup);
@@ -534,8 +556,9 @@ function initScene() {
     console.log('Added flowerCenter to scene');
     console.log('Total objects in scene:', scene.children.length);
 
-    // 花蕊
-    const pistil = createPistil();
+    // 花蕊（初始隐藏，花瓣绽放后才出现）
+    pistil = createPistil();
+    pistil.scale.set(0, 0, 0); // 初始大小为0
     flowerCenter.add(pistil);
 
     // 萼片（玫瑰底部绿色叶状结构，初始包裹花苞）
@@ -549,7 +572,7 @@ function initScene() {
     for (let i = 0; i < 5; i++) {
       const sepal = new THREE.Mesh(sepalGeo, sepalMat);
       const a = (i / 5) * Math.PI * 2;
-      sepal.position.set(Math.cos(a) * 0.04, -0.05, Math.sin(a) * 0.04);
+      sepal.position.set(Math.cos(a) * 0.04, 0, Math.sin(a) * 0.04); // 基部贴合花头底部
       // 初始状态：向上收拢包裹花苞（通过 rotation.y 定位方向，rotation.x 固定不变）
       sepal.rotation.set(-Math.PI / 2 + 0.15, a, 0); // 几乎垂直向上
       sepal.userData.baseRotX = -Math.PI / 2 + 0.15;
@@ -729,6 +752,16 @@ function render(time) {
     }
   }
 
+  // 花蕊动画（花瓣绽放后从花心慢慢变大）
+  if (pistil) {
+    const pistilStart = 0.70; // 花瓣绽放到70%时开始
+    const pistilT = Math.max(0, Math.min(1, (progress - pistilStart) / 0.25)); // 用25%的进度完成生长
+    if (pistilT > 0) {
+      const pistilScale = easeOutCubic(pistilT);
+      pistil.scale.set(pistilScale, pistilScale, pistilScale);
+    }
+  }
+
   // 效果粒子
   updateEffectParticles(effectPoints, progress, time * 0.001);
 
@@ -819,7 +852,25 @@ function render(time) {
 
   if (progress >= 1 && !autoPlayDone.value) {
     autoPlayDone.value = true;
-    hintText.value = '玫瑰为你绽放 · 愿爱意长存';
+    hintText.value = '月下玫瑰';
+  }
+
+  // 文案淡入：跟随绽放进度，20%开始淡入，90%完全显示
+  if (progress < 0.20) {
+    textOpacity.value = 0;
+  } else if (progress < 0.90) {
+    textOpacity.value = easeOutCubic((progress - 0.20) / 0.70);
+  } else {
+    textOpacity.value = 1;
+  }
+
+  // 副标题：花朵完全盛开后才缓缓浮现（用盛开后的 elapsed 时间计算）
+  if (autoPlayDone.value) {
+    const subElapsed = elapsed - DURATION; // 盛开后经过的毫秒数
+    const subT = Math.min(1, subElapsed / 2000); // 2秒内淡入
+    subtitleOpacity.value = easeOutCubic(subT);
+  } else {
+    subtitleOpacity.value = 0;
   }
 
   // 确保渲染正常执行
@@ -835,7 +886,9 @@ function render(time) {
 function startAnimation() {
   startTime = 0;
   autoPlayDone.value = false;
-  hintText.value = '一朵玫瑰，从枝头悄然绽放...';
+  hintText.value = '一朵玫瑰，在月下悄然盛放…';
+  textOpacity.value = 0;
+  subtitleOpacity.value = 0;
   if (effectPoints) {
     effectPoints.userData.particles = [];
     effectPoints.visible = false;
@@ -850,6 +903,9 @@ function startAnimation() {
     heartMesh.scale.set(0, 0, 0);
     heartMesh.material.opacity = 0;
     heartMesh.position.y = 0.05;
+  }
+  if (pistil) {
+    pistil.scale.set(0, 0, 0);
   }
   if (stemGroup) {
     stemGroup.scale.set(1, 0, 1);
@@ -870,7 +926,7 @@ function shareRose() {
   if (navigator.share) {
     navigator.share({
       title: '玫瑰绽放',
-      text: '一朵玫瑰，从枝头悄然绽放...',
+      text: '一朵玫瑰，在月下悄然盛放…',
       url
     }).catch(console.error);
   } else {
@@ -878,7 +934,7 @@ function shareRose() {
       hintText.value = '链接已复制，快去分享吧！';
       setTimeout(() => {
         if (autoPlayDone.value) {
-          hintText.value = '玫瑰为你绽放 · 愿爱意长存';
+          hintText.value = '月下玫瑰';
         }
       }, 2000);
     }).catch(err => {
@@ -894,8 +950,8 @@ function onResize() {
   renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
-// ============ 背景样式辅助 ============
-function starStyle(i) {
+// ============ 背景样式辅助（预计算缓存，避免 re-render 时重新随机） ============
+const cachedStarStyles = shallowRef(Array.from({ length: 80 }, () => {
   const size = 0.5 + Math.random() * 2.5;
   return {
     width: `${size}px`, height: `${size}px`,
@@ -903,9 +959,9 @@ function starStyle(i) {
     animationDelay: `${Math.random() * 4}s`,
     animationDuration: `${2 + Math.random() * 3}s`,
   };
-}
+}));
 
-function petalStyle(i) {
+const cachedPetalStyles = shallowRef(Array.from({ length: 35 }, () => {
   const size = 6 + Math.random() * 10;
   return {
     width: `${size}px`, height: `${size * 1.6}px`,
@@ -913,7 +969,7 @@ function petalStyle(i) {
     animationDelay: `${Math.random() * 6}s`,
     animationDuration: `${6 + Math.random() * 5}s`,
   };
-}
+}));
 
 // ============ 生命周期 ============
 onMounted(() => {
@@ -1164,12 +1220,29 @@ onMounted(() => {
 }
 
 .rose-hint {
-  font-size: 0.9rem;
-  color: rgba(255, 255, 255, 0.5);
+  font-size: 1.6rem;
+  color: rgba(253, 230, 233, 0.95);
   font-family: 'Noto Serif SC', serif;
+  font-weight: 300;
+  letter-spacing: 6px;
+  text-shadow: 0 0 20px rgba(0, 0, 0, 0.7), 0 0 40px rgba(244, 63, 94, 0.12);
+  text-align: center;
+  padding: 0 20px;
+  margin: 0;
+  transition: opacity 0.1s ease;
+}
+
+.rose-subtitle {
+  font-size: 0.75rem;
+  color: rgba(253, 220, 225, 0.85);
+  font-family: 'Noto Serif SC', serif;
+  font-weight: 300;
+  letter-spacing: 3px;
   text-shadow: 0 0 12px rgba(0, 0, 0, 0.6);
   text-align: center;
   padding: 0 20px;
+  margin: 0;
+  transition: opacity 0.1s ease;
 }
 
 .rose-actions {
