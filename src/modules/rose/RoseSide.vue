@@ -920,7 +920,11 @@ function replay() {
   startAnimation();
 }
 
+let isSharing = false; // 防止重复调用 navigator.share
+
 function shareRose() {
+  if (isSharing) return; // 上一次分享尚未完成，忽略
+  isSharing = true;
   // 生成玫瑰花页面的加密分享链接
   const url = buildRoseShareUrl();
   if (navigator.share) {
@@ -928,8 +932,10 @@ function shareRose() {
       title: '玫瑰绽放',
       text: '一朵玫瑰，在月下悄然盛放…',
       url
-    }).catch(console.error);
+    }).finally(() => { isSharing = false; })
+      .catch(console.error);
   } else {
+    isSharing = false; // clipboard 方式无需锁定
     navigator.clipboard.writeText(url).then(() => {
       hintText.value = '链接已复制，快去分享吧！';
       setTimeout(() => {

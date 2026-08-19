@@ -89,7 +89,10 @@ function hideTooltip() {
 }
 
 // 分享功能
+let isSharing = false; // 防止重复调用 navigator.share
 function shareContent() {
+  if (isSharing) return; // 上一次分享尚未完成，忽略
+  isSharing = true;
   // 构建分享载荷
   const payload: SharePayload = {
     festivalId: 'qixi',
@@ -107,8 +110,10 @@ function shareContent() {
       title: '七夕鹊桥相会',
       text: '欣赏牛郎织女鹊桥相会的浪漫场景',
       url: shareLink
-    }).catch(console.error);
+    }).finally(() => { isSharing = false; })
+      .catch(console.error);
   } else {
+    isSharing = false; // clipboard 方式无需锁定
     // 否则复制链接到剪贴板
     navigator.clipboard.writeText(shareLink).then(() => {
       alert('链接已复制到剪贴板！');
