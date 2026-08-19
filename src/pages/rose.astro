@@ -1,8 +1,11 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
+import ShareLinkGuard from '../components/shared/ShareLinkGuard.vue';
 import RoseSide from '../modules/rose/RoseSide.vue';
 ---
 
 <BaseLayout>
-  <RoseSide client:load />
+  <ShareLinkGuard client:load page-type="rose">
+    <RoseSide client:load />
+  </ShareLinkGuard>
 </BaseLayout>

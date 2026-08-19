@@ -1,9 +1,5 @@
 <template>
   <div class="rose-side-module">
-    <!-- 星空背景（保留2D背景） -->
-    <div class="bg-stars" aria-hidden="true">
-      <span v-for="i in 80" :key="'star-'+i" class="star" :style="cachedStarStyles[i - 1]"></span>
-    </div>
     <div class="bg-moon" aria-hidden="true"></div>
     <div class="bg-petals" aria-hidden="true">
       <span v-for="i in 35" :key="'petal-'+i" class="petal" :style="cachedPetalStyles[i - 1]"></span>
@@ -84,18 +80,20 @@ const emit = defineEmits(['share-step']);
 const roseFrom = ref('');
 const roseTo = ref('');
 const roseMsg = ref('');
-// 在 setup 阶段同步检测分享模式，确保子组件 MusicPlayer 挂载时能读到正确值
-function detectRoseShareMode() {
-  if (typeof window === 'undefined') return false;
+const isRoseShareMode = ref(false);
+
+// 在 setup 阶段同步检测分享模式
+(function detectRoseShareMode() {
+  if (typeof window === 'undefined') return;
   const params = new URLSearchParams(window.location.search);
   const encoded = params.get('s');
   if (encoded) {
     const payload = decodeRoseSharePayload(encoded);
-    return !!(payload && payload.page === 'rose');
+    if (payload && payload.page === 'rose') {
+      isRoseShareMode.value = true;
+    }
   }
-  return false;
-}
-const isRoseShareMode = ref(detectRoseShareMode());
+})();
 
 // 立即执行的代码，用于测试组件是否被正确实例化
 console.log('Props received:', props.isShareMode);
@@ -957,16 +955,6 @@ function onResize() {
 }
 
 // ============ 背景样式辅助（预计算缓存，避免 re-render 时重新随机） ============
-const cachedStarStyles = shallowRef(Array.from({ length: 80 }, () => {
-  const size = 0.5 + Math.random() * 2.5;
-  return {
-    width: `${size}px`, height: `${size}px`,
-    left: `${Math.random() * 100}%`, top: `${Math.random() * 70}%`,
-    animationDelay: `${Math.random() * 4}s`,
-    animationDuration: `${2 + Math.random() * 3}s`,
-  };
-}));
-
 const cachedPetalStyles = shallowRef(Array.from({ length: 35 }, () => {
   const size = 6 + Math.random() * 10;
   return {
@@ -1055,25 +1043,6 @@ onMounted(() => {
   overflow: hidden;
   background: radial-gradient(ellipse at 50% 30%, #1a1040 0%, #0e0828 40%, #080418 80%, #03020a 100%);
   z-index: 5;
-}
-
-.bg-stars {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-}
-.star {
-  position: absolute;
-  background: white;
-  border-radius: 50%;
-  opacity: 0.7;
-  animation: twinkle linear infinite;
-  box-shadow: 0 0 4px rgba(255, 255, 255, 0.5);
-}
-@keyframes twinkle {
-  0%, 100% { opacity: 0.3; transform: scale(0.8); }
-  50% { opacity: 1; transform: scale(1.2); }
 }
 
 .bg-moon {

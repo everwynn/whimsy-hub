@@ -1,5 +1,6 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
+import ShareLinkGuard from '../../components/shared/ShareLinkGuard.vue';
 import BlessingPage from '../../modules/blessing/BlessingPage.vue';
 import festivals from '../../data/festivals.json';
 
@@ -14,5 +15,7 @@ const { festivalId } = Astro.props;
 ---
 
 <BaseLayout title="七夕祝福">
-  <BlessingPage client:load festivalId={festivalId} />
+  <ShareLinkGuard client:load page-type="blessing">
+    <BlessingPage client:load :festivalId="festivalId" />
+  </ShareLinkGuard>
 </BaseLayout>
