@@ -1,5 +1,9 @@
 <template>
   <div class="rose-side-module">
+    <!-- 星空背景 -->
+    <div class="bg-stars" aria-hidden="true">
+      <span v-for="i in 80" :key="'star-'+i" class="star" :style="cachedStarStyles[i - 1]"></span>
+    </div>
     <div class="bg-moon" aria-hidden="true"></div>
     <div class="bg-petals" aria-hidden="true">
       <span v-for="i in 35" :key="'petal-'+i" class="petal" :style="cachedPetalStyles[i - 1]"></span>
@@ -25,8 +29,8 @@
             <path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4l4-4 4 4H6c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"/>
           </svg>
         </button>
-        <!-- 鹊桥相会（非分享模式显示） -->
-        <a v-if="!isRoseShareMode" :href="withBase('/blessing/qixi')" class="icon-btn" title="鹊桥相会">
+        <!-- 鹊桥相会（水合后 + 非分享模式显示） -->
+        <a v-if="hydrated && !isRoseShareMode" :href="withBase('/blessing/qixi')" class="icon-btn" title="鹊桥相会">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M17.5 19c0-1.7-1.3-3-3-3h-5c-1.7 0-3 1.3-3 3"/>
             <path d="M12 16V8"/>
@@ -34,8 +38,8 @@
             <path d="M6 19c0-2 2-4 6-4s6 2 6 4"/>
           </svg>
         </a>
-        <!-- 摇签（非分享模式显示） -->
-        <a v-if="!isRoseShareMode" :href="withBase('/blessing/qixi?step=1')" class="icon-btn" title="摇签">
+        <!-- 摇签（水合后 + 非分享模式显示） -->
+        <a v-if="hydrated && !isRoseShareMode" :href="withBase('/blessing/qixi?step=1')" class="icon-btn" title="摇签">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M8 3h8v16a2 2 0 0 1-2 2H10a2 2 0 0 1-2-2V3z"/>
             <path d="M10 3L8 1"/>
@@ -45,8 +49,8 @@
             <path d="M12 15v4"/>
           </svg>
         </a>
-        <!-- 分享（非分享模式显示） -->
-        <button v-if="!isShareMode && !isRoseShareMode" class="icon-btn" @click="shareRose" title="分享">
+        <!-- 分享（水合后 + 非分享模式显示） -->
+        <button v-if="hydrated && !isShareMode && !isRoseShareMode" class="icon-btn" @click="shareRose" title="分享">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="18" cy="5" r="3"/>
             <circle cx="6" cy="12" r="3"/>
@@ -81,6 +85,7 @@ const roseFrom = ref('');
 const roseTo = ref('');
 const roseMsg = ref('');
 const isRoseShareMode = ref(false);
+const hydrated = ref(false); // SSR 水合标记，避免按钮闪烁
 
 // 在 setup 阶段同步检测分享模式
 (function detectRoseShareMode() {
@@ -955,6 +960,16 @@ function onResize() {
 }
 
 // ============ 背景样式辅助（预计算缓存，避免 re-render 时重新随机） ============
+const cachedStarStyles = shallowRef(Array.from({ length: 80 }, () => {
+  const size = 0.5 + Math.random() * 2.5;
+  return {
+    width: `${size}px`, height: `${size}px`,
+    left: `${Math.random() * 100}%`, top: `${Math.random() * 70}%`,
+    animationDelay: `${Math.random() * 4}s`,
+    animationDuration: `${2 + Math.random() * 3}s`,
+  };
+}));
+
 const cachedPetalStyles = shallowRef(Array.from({ length: 35 }, () => {
   const size = 6 + Math.random() * 10;
   return {
@@ -967,6 +982,7 @@ const cachedPetalStyles = shallowRef(Array.from({ length: 35 }, () => {
 
 // ============ 生命周期 ============
 onMounted(() => {
+  hydrated.value = true; // 水合完成，按钮按分享模式条件渲染
   console.log('RoseSide component mounted');
   // 确保在浏览器环境中运行
   if (typeof window !== 'undefined') {
@@ -1043,6 +1059,25 @@ onMounted(() => {
   overflow: hidden;
   background: radial-gradient(ellipse at 50% 30%, #1a1040 0%, #0e0828 40%, #080418 80%, #03020a 100%);
   z-index: 5;
+}
+
+.bg-stars {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+.star {
+  position: absolute;
+  background: white;
+  border-radius: 50%;
+  opacity: 0.7;
+  animation: twinkle linear infinite;
+  box-shadow: 0 0 4px rgba(255, 255, 255, 0.5);
+}
+@keyframes twinkle {
+  0%, 100% { opacity: 0.3; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1.2); }
 }
 
 .bg-moon {
