@@ -51,7 +51,7 @@
       </div>
     </div>
     <!-- 使用统一的音乐播放器组件 -->
-    <MusicPlayer :music-src="musicSrc" />
+    <MusicPlayer :music-src="musicSrc" :auto-play="isSharedView" />
   </div>
 </template>
 
@@ -74,17 +74,8 @@ const musicOn = ref(false);
 const audioLoaded = ref(false);
 const musicSrc = withBase('musics/clavier-music-canon-canon-in-d.mp3');
 
-// 检测是否为分享页面
-const isSharedView = ref(false);
-
-// 在组件挂载时检查 URL 参数
-onMounted(() => {
-  // 检查 URL 中是否有分享相关的参数
-  const urlParams = new URLSearchParams(window.location.search);
-  const encodedParam = urlParams.get('s'); // 假设分享链接使用 's' 参数
-  
-  isSharedView.value = !!encodedParam;
-});
+// 检测是否为分享页面（在 setup 阶段同步设置，确保子组件挂载时能读到正确值）
+const isSharedView = ref(typeof window !== 'undefined' && !!new URLSearchParams(window.location.search).get('s'));
 
 // 添加 tooltip 相关数据
 const tooltip = ref('');

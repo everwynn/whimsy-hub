@@ -11,7 +11,7 @@
 
     <canvas ref="canvasRef" class="rose-canvas"></canvas>
 
-    <MusicPlayer :music-src="musicSrc" />
+    <MusicPlayer :music-src="musicSrc" :auto-play="isRoseShareMode" />
 
     <div class="rose-overlay">
       <!-- 分享链接信息 -->
@@ -83,7 +83,18 @@ const emit = defineEmits(['share-step']);
 const roseFrom = ref('');
 const roseTo = ref('');
 const roseMsg = ref('');
-const isRoseShareMode = ref(false);
+// 在 setup 阶段同步检测分享模式，确保子组件 MusicPlayer 挂载时能读到正确值
+function detectRoseShareMode() {
+  if (typeof window === 'undefined') return false;
+  const params = new URLSearchParams(window.location.search);
+  const encoded = params.get('s');
+  if (encoded) {
+    const payload = decodeRoseSharePayload(encoded);
+    return !!(payload && payload.page === 'rose');
+  }
+  return false;
+}
+const isRoseShareMode = ref(detectRoseShareMode());
 
 // 立即执行的代码，用于测试组件是否被正确实例化
 console.log('Props received:', props.isShareMode);
@@ -911,16 +922,8 @@ onMounted(() => {
   if (typeof window !== 'undefined') {
     console.log('Running in browser environment');
 
-    // 解析加密分享链接
-    const params = new URLSearchParams(window.location.search);
-    const encoded = params.get('s');
-    if (encoded) {
-      const payload = decodeRoseSharePayload(encoded);
-      if (payload && payload.page === 'rose') {
-        isRoseShareMode.value = true;
-        // 可以从 payload 中扩展更多字段（from, to, msg）
-      }
-    }
+    // 分享模式已在 setup 阶段检测，此处仅做日志记录
+    console.log('Rose share mode:', isRoseShareMode.value);
 
     // 确保 DOM 已经完全加载
     if (document.readyState === 'loading') {

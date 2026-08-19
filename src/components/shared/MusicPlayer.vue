@@ -15,7 +15,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted, onUnmounted, watch } from 'vue';
 
 const props = defineProps({
   musicSrc: {
@@ -135,16 +135,74 @@ onMounted(() => {
   // 初始化音频
   initAudio();
   
-  // 尝试播放音乐（可能需要用户交互后才能播放）
-  // 只有在用户有交互行为后才尝试自动播放
+  // 自动播放：尝试播放音乐，如果被浏览器策略阻止，则在首次用户交互时重试
   if (props.autoPlay) {
-    setTimeout(() => {
-      if (musicEnabled.value && isAudioReady) {
-        bgAudio.play().catch(e => {
-          console.log('音频播放被阻止，等待用户交互:', e);
+    const tryPlay = () => {
+      bgAudio.play()
+        .then(() => {
+          console.log('自动播放成功');
+          musicEnabled.value = true;
+        })
+        .catch(e => {
+          console.log('自动播放被阻止，等待用户交互:', e.message);
+          // 在首次用户交互时重试一次
+          const retryOnInteraction = () => {
+            bgAudio.play()
+              .then(() => {
+                console.log('交互后自动播放成功');
+                musicEnabled.value = true;
+              })
+              .catch(err => console.log('交互后播放仍失败:', err.message));
+            document.removeEventListener('click', retryOnInteraction);
+            document.removeEventListener('touchstart', retryOnInteraction);
+            document.removeEventListener('keydown', retryOnInteraction);
+          };
+          document.addEventListener('click', retryOnInteraction, { once: true });
+          document.addEventListener('touchstart', retryOnInteraction, { once: true });
+          document.addEventListener('keydown', retryOnInteraction, { once: true });
         });
-      }
-    }, 100);
+    };
+    // 等待音频就绪后尝试播放
+    if (isAudioReady) {
+      tryPlay();
+    } else {
+      bgAudio.addEventListener('canplay', () => tryPlay(), { once: true });
+    }
+  }
+});
+
+// 兜底：监听 autoPlay 变化，如果父组件延迟设置分享模式也能触发播放
+watch(() => props.autoPlay, (newVal) => {
+  if (newVal && bgAudio && !musicEnabled.value) {
+    const tryPlay = () => {
+      bgAudio.play()
+        .then(() => {
+          console.log('延迟自动播放成功');
+          musicEnabled.value = true;
+        })
+        .catch(e => {
+          console.log('延迟自动播放被阻止:', e.message);
+          const retryOnInteraction = () => {
+            bgAudio.play()
+              .then(() => {
+                console.log('延迟交互后自动播放成功');
+                musicEnabled.value = true;
+              })
+              .catch(err => console.log('延迟交互后播放仍失败:', err.message));
+            document.removeEventListener('click', retryOnInteraction);
+            document.removeEventListener('touchstart', retryOnInteraction);
+            document.removeEventListener('keydown', retryOnInteraction);
+          };
+          document.addEventListener('click', retryOnInteraction, { once: true });
+          document.addEventListener('touchstart', retryOnInteraction, { once: true });
+          document.addEventListener('keydown', retryOnInteraction, { once: true });
+        });
+    };
+    if (isAudioReady) {
+      tryPlay();
+    } else {
+      bgAudio.addEventListener('canplay', () => tryPlay(), { once: true });
+    }
   }
 });
 
